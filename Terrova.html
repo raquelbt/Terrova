@@ -332,8 +332,8 @@ function playPlaceSound(){playNoise(600,2,'bandpass',0.06,0.28);}
 function playFallSound(){playNoise(150,0.5,'highpass',0.25,0.32);}
 
 // ─── Block IDs ──────────────────────────────────
-const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WATER:4,SAND:5,WOOD:6,LEAVES:7,PLANK:8,COBBLE:9,TEMPLE:10,TEMPLE_DARK:11,VILLAGE_WALL:12,VILLAGE_ROOF:13,GRAVEL:14,DEEP_WATER:15,SEAGRASS:16,DIAMOND_ORE:17,ALUMINIUM_ORE:18,QUARTZ_ORE:19,GOLD_ORE:20,CRAFTY_TABLE:21};
-const BREAK_T={1:.7,2:.6,3:4.5,4:0,5:.6,6:2.5,7:.4,8:1.5,9:3.5,10:3.5,11:3.5,12:2.8,13:2,14:.5,15:0,16:.3,17:9,18:7,19:6,20:8,21:2};
+const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WATER:4,SAND:5,WOOD:6,LEAVES:7,PLANK:8,COBBLE:9,TEMPLE:10,TEMPLE_DARK:11,VILLAGE_WALL:12,VILLAGE_ROOF:13,GRAVEL:14,DEEP_WATER:15,SEAGRASS:16,DIAMOND_ORE:17,ALUMINIUM_ORE:18,QUARTZ_ORE:19,GOLD_ORE:20,CRAFTY_TABLE:21,DOOR_CLOSED:22,DOOR_OPEN:23,CHEST:24,FURNACE:25,BOOKSHELF:26};
+const BREAK_T={1:.7,2:.6,3:4.5,4:0,5:.6,6:2.5,7:.4,8:1.5,9:3.5,10:3.5,11:3.5,12:2.8,13:2,14:.5,15:0,16:.3,17:9,18:7,19:6,20:8,21:2,22:1.5,23:0,24:2,25:3.5,26:2};
 const BLOCK_DROP={1:'dirt',2:'dirt',3:'cobble',5:'sand',6:'log',7:null,8:'plank',9:'cobble',10:'cobble',11:'cobble',12:'cobble',13:'plank',14:'gravel',17:'diamond',18:'aluminium',19:'quartz',20:'gold',21:'crafty'};
 const NEEDS_PICK=new Set([B.STONE,B.COBBLE,B.DIAMOND_ORE,B.ALUMINIUM_ORE,B.QUARTZ_ORE,B.GOLD_ORE,B.TEMPLE,B.TEMPLE_DARK]);
 
@@ -347,7 +347,7 @@ const WORLD_W=256,WORLD_H=48,WORLD_D=256,SEA_LEVEL=18;
 let wdata;
 function gB(x,y,z){if(x<0||x>=WORLD_W||y<0||y>=WORLD_H||z<0||z>=WORLD_D)return B.AIR;return wdata[x+y*WORLD_W+z*WORLD_W*WORLD_H];}
 function sB(x,y,z,t){if(x<0||x>=WORLD_W||y<0||y>=WORLD_H||z<0||z>=WORLD_D)return;wdata[x+y*WORLD_W+z*WORLD_W*WORLD_H]=t;}
-function getSY(x,z){x=Math.max(0,Math.min(WORLD_W-1,Math.round(x)));z=Math.max(0,Math.min(WORLD_D-1,Math.round(z)));for(let y=WORLD_H-1;y>=0;y--){const b=gB(x,y,z);if(b!==B.AIR&&b!==B.WATER&&b!==B.DEEP_WATER&&b!==B.SEAGRASS&&b!==B.LEAVES)return y;}return SEA_LEVEL;}
+function getSY(x,z){x=Math.max(0,Math.min(WORLD_W-1,Math.round(x)));z=Math.max(0,Math.min(WORLD_D-1,Math.round(z)));for(let y=WORLD_H-1;y>=0;y--){const b=gB(x,y,z);if(b!==B.AIR&&b!==B.WATER&&b!==B.DEEP_WATER&&b!==B.SEAGRASS&&b!==B.LEAVES&&b!==B.DOOR_OPEN)return y;}return SEA_LEVEL;}
 
 // ─── Pixel-art Texture System ───────────────────
 let BTEX={};
@@ -369,81 +369,114 @@ function makeOreTex(oreCol,seed){
   },seed);
 }
 function initTextures(){
-  // GRASS
-  BTEX[B.GRASS]=canvasTex((c,r)=>{pixelFill(c,r,['#5ab552','#4ea848','#68c25f','#52a84a','#3f9a36','#61cc58']);},1);
-  // DIRT
-  BTEX[B.DIRT]=canvasTex((c,r)=>{pixelFill(c,r,['#8B5E3C','#9a6a44','#7a5230','#a07040','#8a5c38']);},2);
-  // STONE
-  BTEX[B.STONE]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=110+v*38|0;c.fillStyle=`rgb(${g},${g},${g})`;c.fillRect(x,y,1,1);}},3);
-  // COBBLE — rough stone with seams
+  // GRASS - vibrant
+  BTEX[B.GRASS]=canvasTex((c,r)=>{pixelFill(c,r,['#4cd636','#3fc930','#5ce843','#45d038','#2cc526','#50de3c','#58e040','#33c026']);},1);
+  // DIRT - warm
+  BTEX[B.DIRT]=canvasTex((c,r)=>{pixelFill(c,r,['#9B6B3C','#b07840','#7a5230','#c08050','#8a5c38','#a87040']);},2);
+  // STONE - cooler grey
+  BTEX[B.STONE]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=100+v*50|0;c.fillStyle=`rgb(${g},${g},${g+5})`;c.fillRect(x,y,1,1);}},3);
+  // COBBLE
   BTEX[B.COBBLE]=canvasTex((c,r)=>{
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=80+v*45|0;c.fillStyle=`rgb(${g},${g},${g+4})`;c.fillRect(x,y,1,1);}
-    c.fillStyle='rgba(50,50,50,0.55)';
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=78+v*48|0;c.fillStyle=`rgb(${g},${g},${g+4})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(40,40,40,0.6)';
     [[2,0,3,1],[8,0,4,1],[0,3,2,1],[5,3,3,1],[11,3,3,1],[3,7,4,1],[9,7,5,1],[1,11,3,1],[6,11,4,1],[12,11,3,1],[0,15,5,1],[7,15,4,1]].forEach(([x,y,w,h])=>c.fillRect(x,y,w,h));
   },4);
-  // SAND
-  BTEX[B.SAND]=canvasTex((c,r)=>{pixelFill(c,r,['#e2cb8a','#d4be76','#ecd98e','#c8ae64','#dfc882']);},5);
-  // WOOD LOG — grain rings
+  // SAND - golden
+  BTEX[B.SAND]=canvasTex((c,r)=>{pixelFill(c,r,['#f2d070','#e4c060','#fce880','#d4b050','#eccf68','#f8da78']);},5);
+  // WOOD LOG - rich brown grain
   BTEX[B.WOOD]=canvasTex((c,r)=>{
     for(let y=0;y<16;y++)for(let x=0;x<16;x++){
       const ring=(Math.sin((x-8)*0.7+(y-8)*0.2)*0.5+0.5);const v=r();
-      const br=90+ring*55+v*18|0;c.fillStyle=`rgb(${br},${br*0.62|0},${br*0.28|0})`;c.fillRect(x,y,1,1);
+      const br=100+ring*60+v*18|0;c.fillStyle=`rgb(${br},${br*0.58|0},${br*0.22|0})`;c.fillRect(x,y,1,1);
     }
   },6);
-  // LEAVES — mottled green with transparency gaps
+  // LEAVES - lush vibrant green
   BTEX[B.LEAVES]=canvasTex((c,r)=>{
     for(let y=0;y<16;y++)for(let x=0;x<16;x++){
       const v=r();
-      if(v>0.12){const g=90+v*75|0;c.fillStyle=`rgb(${25+v*18|0},${g},${18+v*14|0})`;c.fillRect(x,y,1,1);}
+      if(v>0.10){const g=100+v*80|0;const rr=20+v*20|0;c.fillStyle=`rgb(${rr},${g},${rr*0.6|0})`;c.fillRect(x,y,1,1);}
     }
   },7);
-  // PLANK — horizontal wood grain
+  // PLANK - warm wood grain
   BTEX[B.PLANK]=canvasTex((c,r)=>{
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=170+v*22|0;c.fillStyle=`rgb(${br},${br*0.75|0},${br*0.48|0})`;c.fillRect(x,y,1,1);}
-    c.fillStyle='rgba(110,70,30,0.32)';for(let y=0;y<16;y+=4)c.fillRect(0,y,16,1);
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=185+v*22|0;c.fillStyle=`rgb(${br},${br*0.72|0},${br*0.42|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(120,70,20,0.35)';for(let y=0;y<16;y+=4)c.fillRect(0,y,16,1);
   },8);
   // GRAVEL
-  BTEX[B.GRAVEL]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=v>0.5?115+v*38|0:70+v*38|0;c.fillStyle=`rgb(${g},${g},${g})`;c.fillRect(x,y,1,1);}},9);
-  // TEMPLE — sandstone carved
+  BTEX[B.GRAVEL]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=v>0.5?118+v*38|0:72+v*38|0;c.fillStyle=`rgb(${g},${g},${g})`;c.fillRect(x,y,1,1);}},9);
+  // TEMPLE - warm sandstone
   BTEX[B.TEMPLE]=canvasTex((c,r)=>{
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=195+v*28|0;c.fillStyle=`rgb(${br},${br*0.83|0},${br*0.50|0})`;c.fillRect(x,y,1,1);}
-    c.fillStyle='rgba(140,90,40,0.22)';for(let y=0;y<16;y+=4)c.fillRect(0,y,16,1);
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=210+v*28|0;c.fillStyle=`rgb(${br},${br*0.80|0},${br*0.44|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(150,90,30,0.25)';for(let y=0;y<16;y+=4)c.fillRect(0,y,16,1);
   },10);
-  // TEMPLE DARK
-  BTEX[B.TEMPLE_DARK]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=135+v*22|0;c.fillStyle=`rgb(${br},${br*0.74|0},${br*0.40|0})`;c.fillRect(x,y,1,1);}},11);
-  // VILLAGE_WALL — stone brick
+  BTEX[B.TEMPLE_DARK]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=145+v*22|0;c.fillStyle=`rgb(${br},${br*0.70|0},${br*0.35|0})`;c.fillRect(x,y,1,1);}},11);
+  // VILLAGE_WALL - stone brick
   BTEX[B.VILLAGE_WALL]=canvasTex((c,r)=>{
-    c.fillStyle='#888880';c.fillRect(0,0,16,16);
+    c.fillStyle='#7a7870';c.fillRect(0,0,16,16);
     const rng2=mkPRNG(999);
-    // Even rows
-    for(let col=0;col<3;col++){const bx=col*6,g=165+rng2()*22|0;c.fillStyle=`rgb(${g},${g*0.93|0},${g*0.84|0})`;c.fillRect(bx,0,5,7);}
-    // Odd rows (offset)
-    for(let col=0;col<3;col++){const bx=col*6+3,g=168+rng2()*20|0;c.fillStyle=`rgb(${g},${g*0.92|0},${g*0.82|0})`;c.fillRect(bx,8,5,7);}
-    // Mortar
-    c.fillStyle='rgba(80,80,75,0.7)';
+    for(let col=0;col<3;col++){const bx=col*6,g=170+rng2()*22|0;c.fillStyle=`rgb(${g},${g*0.92|0},${g*0.82|0})`;c.fillRect(bx,0,5,7);}
+    for(let col=0;col<3;col++){const bx=col*6+3,g=172+rng2()*20|0;c.fillStyle=`rgb(${g},${g*0.91|0},${g*0.80|0})`;c.fillRect(bx,8,5,7);}
+    c.fillStyle='rgba(60,60,55,0.75)';
     c.fillRect(0,7,16,2);for(let x=0;x<16;x+=6)c.fillRect(x,0,1,7);
     c.fillRect(0,15,16,1);for(let x=3;x<16;x+=6)c.fillRect(x,8,1,7);
   },12);
-  // VILLAGE_ROOF — dark slate tiles
+  // VILLAGE_ROOF - terracotta red tiles
   BTEX[B.VILLAGE_ROOF]=canvasTex((c,r)=>{
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=85+v*28|0;c.fillStyle=`rgb(${g+12|0},${g*0.50|0},${g*0.50|0})`;c.fillRect(x,y,1,1);}
-    c.fillStyle='rgba(50,20,20,0.4)';for(let y=0;y<16;y+=3)c.fillRect(0,y,16,1);
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),rv=170+v*40|0,gv=rv*0.42|0,bv=rv*0.30|0;c.fillStyle=`rgb(${rv},${gv},${bv})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(80,20,10,0.4)';for(let y=0;y<16;y+=3)c.fillRect(0,y,16,1);
   },13);
   // ORES
-  BTEX[B.DIAMOND_ORE]=makeOreTex('rgba(0,210,220,0.92)',17);
-  BTEX[B.ALUMINIUM_ORE]=makeOreTex('rgba(195,215,228,0.9)',18);
-  BTEX[B.QUARTZ_ORE]=makeOreTex('rgba(240,238,232,0.95)',19);
-  BTEX[B.GOLD_ORE]=makeOreTex('rgba(250,205,0,0.92)',20);
+  BTEX[B.DIAMOND_ORE]=makeOreTex('rgba(0,230,245,0.95)',17);
+  BTEX[B.ALUMINIUM_ORE]=makeOreTex('rgba(200,220,235,0.92)',18);
+  BTEX[B.QUARTZ_ORE]=makeOreTex('rgba(245,242,238,0.97)',19);
+  BTEX[B.GOLD_ORE]=makeOreTex('rgba(255,210,0,0.94)',20);
   // CRAFTY TABLE
   BTEX[B.CRAFTY_TABLE]=canvasTex((c,r)=>{
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=85+v*18|0;c.fillStyle=`rgb(${br},${br*0.58|0},${br*0.28|0})`;c.fillRect(x,y,1,1);}
-    c.fillStyle='rgba(200,140,50,0.5)';for(let i=4;i<16;i+=4)c.fillRect(0,i,16,1);for(let i=4;i<16;i+=4)c.fillRect(i,0,1,16);
-    c.fillStyle='rgba(180,120,40,0.3)';c.fillRect(7,0,2,16);c.fillRect(0,7,16,2);
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=90+v*18|0;c.fillStyle=`rgb(${br},${br*0.55|0},${br*0.25|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(210,150,55,0.55)';for(let i=4;i<16;i+=4)c.fillRect(0,i,16,1);for(let i=4;i<16;i+=4)c.fillRect(i,0,1,16);
+    c.fillStyle='rgba(190,130,45,0.35)';c.fillRect(7,0,2,16);c.fillRect(0,7,16,2);
   },21);
-  // WATER (surface)
-  BTEX[B.WATER]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r();c.fillStyle=`rgba(${20+v*12|0},${90+v*40|0},${200+v*30|0},0.85)`;c.fillRect(x,y,1,1);}},4);
-  BTEX[B.DEEP_WATER]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r();c.fillStyle=`rgba(${10+v*8|0},${50+v*25|0},${150+v*20|0},0.9)`;c.fillRect(x,y,1,1);}},15);
-  // Fallback
+  // DOOR CLOSED - wood door with crossbar
+  BTEX[B.DOOR_CLOSED]=canvasTex((c,r)=>{
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=140+v*20|0;c.fillStyle=`rgb(${br},${br*0.65|0},${br*0.30|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(60,30,5,0.6)';
+    c.fillRect(0,0,16,2);c.fillRect(0,14,16,2);c.fillRect(0,7,16,2);
+    c.fillRect(0,0,2,16);c.fillRect(14,0,2,16);
+    c.fillStyle='rgba(200,160,60,0.9)';c.fillRect(11,7,2,2); // knob
+  },22);
+  // DOOR OPEN - angled door panel visible
+  BTEX[B.DOOR_OPEN]=canvasTex((c,r)=>{
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=120+v*18|0;c.fillStyle=`rgba(${br},${br*0.60|0},${br*0.25|0},0.7)`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(60,30,5,0.4)';
+    c.fillRect(0,0,16,2);c.fillRect(0,14,16,2);c.fillRect(0,0,2,16);c.fillRect(14,0,2,16);
+  },23);
+  // CHEST - brown with gold lock
+  BTEX[B.CHEST]=canvasTex((c,r)=>{
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=120+v*20|0;c.fillStyle=`rgb(${br},${br*0.62|0},${br*0.28|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(200,160,40,0.9)';
+    c.fillRect(2,0,12,2);c.fillRect(2,14,12,2);c.fillRect(0,2,2,12);c.fillRect(14,2,2,12);
+    c.fillRect(4,7,8,2);
+    c.fillStyle='rgba(255,210,60,1)';c.fillRect(7,6,2,3); // lock
+  },24);
+  // FURNACE - stone with fire glow
+  BTEX[B.FURNACE]=canvasTex((c,r)=>{
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),g=105+v*38|0;c.fillStyle=`rgb(${g},${g},${g+3})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(255,100,10,0.85)';c.fillRect(4,4,8,8); // fire opening
+    c.fillStyle='rgba(255,200,50,0.7)';c.fillRect(5,5,6,6); // inner glow
+    c.fillStyle='rgba(255,255,200,0.6)';c.fillRect(6,6,4,4); // bright core
+    c.fillStyle='rgba(40,40,40,0.7)';
+    c.fillRect(2,2,12,2);c.fillRect(2,12,12,2);c.fillRect(2,4,2,8);c.fillRect(12,4,2,8);
+  },25);
+  // BOOKSHELF - wood with book spines
+  BTEX[B.BOOKSHELF]=canvasTex((c,r)=>{
+    for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r(),br=155+v*18|0;c.fillStyle=`rgb(${br},${br*0.70|0},${br*0.38|0})`;c.fillRect(x,y,1,1);}
+    c.fillStyle='rgba(60,30,5,0.5)';c.fillRect(0,4,16,2);c.fillRect(0,10,16,2);
+    const bookColors=['#cc2222','#2244cc','#22aa22','#cc8822','#882288','#228888'];
+    for(let i=0;i<6;i++){c.fillStyle=bookColors[i];c.fillRect(i*3,5,2,5);}
+  },26);
+  // WATER / DEEP WATER - vibrant blue
+  BTEX[B.WATER]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r();c.fillStyle=`rgba(${15+v*12|0},${110+v*50|0},${220+v*30|0},0.88)`;c.fillRect(x,y,1,1);}},4);
+  BTEX[B.DEEP_WATER]=canvasTex((c,r)=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const v=r();c.fillStyle=`rgba(${8+v*8|0},${55+v*25|0},${165+v*20|0},0.92)`;c.fillRect(x,y,1,1);}},15);
   BTEX._fallback=canvasTex((c)=>{c.fillStyle='#888';c.fillRect(0,0,16,16);},0);
 }
 function getTex(type){return BTEX[type]||BTEX._fallback;}
@@ -461,6 +494,7 @@ function cave3(x,y,z,sd){return(sn(x*.22+sd,z*.22+sd*.7)*sn(z*.22+sd*2,y*.28+sd*
 
 // ─── World Generation ────────────────────────────
 function generateWorld(seed){
+  treeTops=[];
   wdata=new Uint8Array(WORLD_W*WORLD_H*WORLD_D);
   for(let x=0;x<WORLD_W;x++)for(let z=0;z<WORLD_D;z++){
     let h=fN(x*.03+seed,z*.03+seed,seed);
@@ -509,6 +543,7 @@ function placeTree(x,y,z){
     if(Math.abs(dx)+Math.abs(dz)+Math.abs(dy)<=3&&gB(x+dx,top+dy,z+dz)===B.AIR)sB(x+dx,top+dy,z+dz,B.LEAVES);
   }
   sB(x,top+2,z,B.LEAVES);
+  treeTops.push({x,y:top+1,z,phase:(x*4.13+z*2.87)%6.28});
 }
 
 function placeTemple(cx,cz){
@@ -542,12 +577,17 @@ function placeVillage(cx,cz){
     // Roof: wood beams + plank
     for(let dx=-1;dx<=h.w+1;dx++)for(let dz=-1;dz<=h.d+1;dz++){sB(bx+dx,by+4,bz+dz,B.VILLAGE_ROOF);sB(bx+dx,by+5,bz+dz,B.WOOD);}
     // Door (front face)
-    const mx=bx+Math.floor(h.w/2);for(let dy=0;dy<3;dy++)sB(mx,by+dy,bz,B.AIR);
+    const mx=bx+Math.floor(h.w/2);sB(mx,by,bz,B.DOOR_CLOSED);sB(mx,by+1,bz,B.DOOR_CLOSED);sB(mx,by+2,bz,B.AIR);
     // Windows
     sB(bx+1,by+2,bz+h.d,B.AIR);sB(bx+h.w-1,by+2,bz,B.AIR);
     // Chimney (cobble tower on roof)
     const chx=bx+h.w-2,chz=bz+h.d-2;
     for(let dy=5;dy<=7;dy++)sB(chx,by+dy,chz,B.COBBLE);
+    // Interior furniture
+    const fx=bx+2,fz=bz+2;
+    sB(fx,by+1,fz,B.CHEST);sB(fx+3,by+1,fz,B.FURNACE);
+    sB(fx,by+1,fz+3,B.BOOKSHELF);
+    sB(fx+3,by+1,fz+3,B.CRAFTY_TABLE);
   });
 }
 
@@ -584,6 +624,17 @@ function buildWorldMesh(){
   }
   for(const m of Object.values(insts))m.instanceMatrix.needsUpdate=true;
   scene.add(worldGroup);
+  // Tree canopy dynamic meshes
+  if(treeTops.length>0){
+    const leafGeo=new THREE.SphereGeometry(2.5,8,8),leafMat=new THREE.MeshLambertMaterial({color:0x2d8a2d});
+    for(const t of treeTops){
+      const leafMesh=new THREE.Mesh(leafGeo,leafMat);
+      leafMesh.position.set(t.x,t.y,t.z);
+      leafMesh.castShadow=true;leafMesh.receiveShadow=true;
+      leafMesh._treePhase=t.phase;
+      worldGroup.add(leafMesh);
+    }
+  }
 }
 let rebuildTimer=null;
 function scheduleRebuild(){if(rebuildTimer)clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>{buildWorldMesh();rebuildTimer=null;},80);}
@@ -753,7 +804,21 @@ function updatePlayer(dt){
   if(keys.KeyW||keys.ArrowUp)mv.z-=1;if(keys.KeyS||keys.ArrowDown)mv.z+=1;
   if(keys.KeyA||keys.ArrowLeft)mv.x-=1;if(keys.KeyD||keys.ArrowRight)mv.x+=1;
   const moving=mv.lengthSq()>0;
-  if(moving){mv.normalize().applyEuler(new THREE.Euler(0,yaw,0,'YXZ'));pPos.x=Math.max(1,Math.min(WORLD_W-2,pPos.x+mv.x*SPD*dt));pPos.z=Math.max(1,Math.min(WORLD_D-2,pPos.z+mv.z*SPD*dt));}
+  if(moving){
+    mv.normalize().applyEuler(new THREE.Euler(0,yaw,0,'YXZ'));
+    const dx=mv.x*SPD*dt,dz=mv.z*SPD*dt;
+    const nx=pPos.x+dx,nz=pPos.z+dz;
+    // Proper multi-height horizontal collision: check feet, body, and head
+    // pPos.y is eye-level (~ground+1.75). Feet at pPos.y-1.5, head at pPos.y+0.2
+    const PASSABLE=b=>b===B.AIR||b===B.WATER||b===B.DEEP_WATER||b===B.SEAGRASS||b===B.LEAVES||b===B.DOOR_OPEN;
+    function solidAt(tx,ty,tz){return!PASSABLE(gB(Math.round(tx),ty,Math.round(tz)));}
+    function hBlocked(tx,tz){
+      const feetY=Math.floor(pPos.y-1.4),bodyY=Math.floor(pPos.y-0.4);
+      return solidAt(tx,feetY,tz)||solidAt(tx,bodyY,tz);
+    }
+    if(!hBlocked(nx,pPos.z))pPos.x=Math.max(1,Math.min(WORLD_W-2,nx));
+    if(!hBlocked(pPos.x,nz))pPos.z=Math.max(1,Math.min(WORLD_D-2,nz));
+  }
   if(creativeMode){
     if(keys.Space)pPos.y+=6*dt;else if(keys.ShiftLeft||keys.ControlLeft)pPos.y-=6*dt;
     pPos.y=Math.max(.5,pPos.y);
@@ -764,7 +829,7 @@ function updatePlayer(dt){
     // Head collision - check blocks above
     const headY=Math.round(pPos.y+0.5);
     const headBlock=gB(Math.round(pPos.x),headY,Math.round(pPos.z));
-    if(headBlock!==B.AIR&&headBlock!==B.WATER&&headBlock!==B.DEEP_WATER&&headBlock!==B.SEAGRASS){
+    if(headBlock!==B.AIR&&headBlock!==B.WATER&&headBlock!==B.DEEP_WATER&&headBlock!==B.SEAGRASS&&headBlock!==B.DOOR_OPEN){
       pPos.y=headY-0.5;if(pVelY>0)pVelY=0;
     }
     if(keys.Space&&pOnGround){pVelY=JVEL;pOnGround=false;}
@@ -875,13 +940,16 @@ function updateDayNight(dt){
   dayTime=(dayTime+dt/1200*spd)%1;
   const ang=dayTime*Math.PI*2;
   sunLight.position.set(Math.cos(ang)*80,Math.sin(ang)*80,20);
-  const DAY=new THREE.Color(0x87ceeb),DUSK=new THREE.Color(0xff8840),NITE=new THREE.Color(0x0a0a1a);
+  // Position sun and moon meshes
+  if(sunMesh){sunMesh.position.copy(sunLight.position).normalize().multiplyScalar(100);}
+  if(moonMesh){moonMesh.position.set(Math.cos(ang+Math.PI)*80,Math.sin(ang+Math.PI)*80,-20).normalize().multiplyScalar(100);}
+  const DAY=new THREE.Color(0x89E5FF),DUSK=new THREE.Color(0xFF9947),NITE=new THREE.Color(0x0D0D2B);
   let sky;
   const nb=nightAmbient;
-  if(dayTime>.05&&dayTime<.5){const t=Math.sin((dayTime-.05)/.45*Math.PI);sky=DAY.clone();sunLight.intensity=.55+t*.75;ambLight.intensity=.32+t*.35;if(!isDay){isDay=true;despawnKukis();}}
-  else if(dayTime>=.5&&dayTime<.6){const t=(dayTime-.5)/.1;sky=new THREE.Color().lerpColors(DAY,DUSK,t);sunLight.intensity=.8*(1-t);ambLight.intensity=(.32)*(1-t)+nb;if(t>.5&&isDay){isDay=false;spawnKukis();}}
+  if(dayTime>.05&&dayTime<.5){const t=Math.sin((dayTime-.05)/.45*Math.PI);sky=DAY.clone();sunLight.intensity=.6+t*.8;ambLight.intensity=.38+t*.38;if(!isDay){isDay=true;despawnKukis();}}
+  else if(dayTime>=.5&&dayTime<.6){const t=(dayTime-.5)/.1;sky=new THREE.Color().lerpColors(DAY,DUSK,t);sunLight.intensity=.85*(1-t);ambLight.intensity=(.38)*(1-t)+nb;if(t>.5&&isDay){isDay=false;spawnKukis();}}
   else if(dayTime>=.6||dayTime<.02){sky=NITE.clone();sunLight.intensity=0;ambLight.intensity=nb;isDay=false;}
-  else{const t=(dayTime-.02)/.03;sky=new THREE.Color().lerpColors(DUSK,DAY,t);sunLight.intensity=t*.7;ambLight.intensity=nb+t*.3;if(t>.4&&!isDay){isDay=true;despawnKukis();}}
+  else{const t=(dayTime-.02)/.03;sky=new THREE.Color().lerpColors(DUSK,DAY,t);sunLight.intensity=t*.75;ambLight.intensity=nb+t*.35;if(t>.4&&!isDay){isDay=true;despawnKukis();}}
   renderer.setClearColor(sky);if(scene.background)scene.background=sky;if(scene.fog)scene.fog.color=sky;
   const ti=document.getElementById('timeIndicator');if(ti)ti.textContent=isDay?'☀️ Day':'🌙 Night';
 }
@@ -893,11 +961,16 @@ function initScene(){
   renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gameCanvas'),antialias:false});// NearestFilter + no antialias = crisp pixels
   renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,140);
-  ambLight=new THREE.AmbientLight(0xffffff,.5);scene.add(ambLight);
-  sunLight=new THREE.DirectionalLight(0xfffde7,1.3);sunLight.castShadow=true;
+  ambLight=new THREE.AmbientLight(0xffffff,.6);scene.add(ambLight);
+  sunLight=new THREE.DirectionalLight(0xfffde7,1.5);sunLight.castShadow=true;
   sunLight.shadow.mapSize.width=2048;sunLight.shadow.mapSize.height=2048;
   sunLight.shadow.camera.left=-80;sunLight.shadow.camera.right=80;sunLight.shadow.camera.top=80;sunLight.shadow.camera.bottom=-80;sunLight.shadow.camera.far=250;
   scene.add(sunLight);
+  // Sun and moon meshes
+  const sunGeo=new THREE.SphereGeometry(3,16,16),sunMat=new THREE.MeshBasicMaterial({color:0xFFDB58});
+  sunMesh=new THREE.Mesh(sunGeo,sunMat);sunMesh.castShadow=false;sunMesh.receiveShadow=false;scene.add(sunMesh);
+  const moonGeo=new THREE.SphereGeometry(2.8,16,16),moonMat=new THREE.MeshBasicMaterial({color:0xDDDDDD});
+  moonMesh=new THREE.Mesh(moonGeo,moonMat);moonMesh.castShadow=false;moonMesh.receiveShadow=false;scene.add(moonMesh);
   mobGroup=new THREE.Group();scene.add(mobGroup);
   // Stars
   const sg=new THREE.BufferGeometry(),sp=[];
@@ -929,7 +1002,16 @@ function setupControls(){
     if(document.pointerLockElement!==renderer.domElement)return;
     ensureAudio();
     if(e.button===0){isBreaking=true;breakTarget=getTarget();}
-    if(e.button===2){const t=getTarget();if(t&&gB(t.x,t.y,t.z)===B.CRAFTY_TABLE){openCraftingUI();return;}placeBlock();}
+    if(e.button===2){
+      const t=getTarget();
+      if(t){
+        const b=gB(t.x,t.y,t.z);
+        if(b===B.CRAFTY_TABLE){openCraftingUI();return;}
+        if(b===B.DOOR_CLOSED){sB(t.x,t.y,t.z,B.DOOR_OPEN);scheduleRebuild();showMsg('🚪 Door opened');return;}
+        if(b===B.DOOR_OPEN){sB(t.x,t.y,t.z,B.DOOR_CLOSED);scheduleRebuild();showMsg('🚪 Door closed');return;}
+      }
+      placeBlock();
+    }
   });
   document.addEventListener('mouseup',e=>{if(e.button===0){isBreaking=false;breakProg=0;document.getElementById('breakWrap').style.display='none';}});
   document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -957,6 +1039,15 @@ function gameLoop(ts){
   animID=requestAnimationFrame(gameLoop);
   const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;
   if(!paused){updatePlayer(dt);updateDayNight(dt);mobs.forEach(m=>m.update(dt));updateBreaking(dt);updateHL();updateParticles(dt);}
+  // Animate tree canopies with wind sway
+  if(worldGroup){
+    worldGroup.children.forEach(child=>{
+      if(child._treePhase!==undefined){
+        const sway=Math.sin(ts*0.001+child._treePhase)*0.08;
+        child.rotation.z=sway;
+      }
+    });
+  }
   renderer.render(scene,camera);
 }
 
