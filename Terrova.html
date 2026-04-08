@@ -808,13 +808,13 @@ function updatePlayer(dt){
     mv.normalize().applyEuler(new THREE.Euler(0,yaw,0,'YXZ'));
     const dx=mv.x*SPD*dt,dz=mv.z*SPD*dt;
     const nx=pPos.x+dx,nz=pPos.z+dz;
-    // Proper multi-height horizontal collision: check feet, body, and head
-    // pPos.y is eye-level (~ground+1.75). Feet at pPos.y-1.5, head at pPos.y+0.2
+    // Horizontal collision: check the 2 air-space blocks the player's body occupies
+    // pPos.y = groundY + PHEIGHT (1.75). Body occupies groundY+1 and groundY+2.
     const PASSABLE=b=>b===B.AIR||b===B.WATER||b===B.DEEP_WATER||b===B.SEAGRASS||b===B.LEAVES||b===B.DOOR_OPEN;
     function solidAt(tx,ty,tz){return!PASSABLE(gB(Math.round(tx),ty,Math.round(tz)));}
     function hBlocked(tx,tz){
-      const feetY=Math.floor(pPos.y-1.4),bodyY=Math.floor(pPos.y-0.4);
-      return solidAt(tx,feetY,tz)||solidAt(tx,bodyY,tz);
+      const groundY=Math.round(pPos.y-PHEIGHT); // block player stands ON
+      return solidAt(tx,groundY+1,tz)||solidAt(tx,groundY+2,tz); // check ABOVE ground
     }
     if(!hBlocked(nx,pPos.z))pPos.x=Math.max(1,Math.min(WORLD_W-2,nx));
     if(!hBlocked(pPos.x,nz))pPos.z=Math.max(1,Math.min(WORLD_D-2,nz));
