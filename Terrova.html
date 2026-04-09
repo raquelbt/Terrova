@@ -383,11 +383,30 @@ function initTextures(){
   },4);
   // SAND - golden
   BTEX[B.SAND]=canvasTex((c,r)=>{pixelFill(c,r,['#f2d070','#e4c060','#fce880','#d4b050','#eccf68','#f8da78']);},5);
-  // WOOD LOG - rich brown grain
+  // WOOD LOG - rich brown grain with bark ridge details
   BTEX[B.WOOD]=canvasTex((c,r)=>{
     for(let y=0;y<16;y++)for(let x=0;x<16;x++){
-      const ring=(Math.sin((x-8)*0.7+(y-8)*0.2)*0.5+0.5);const v=r();
-      const br=100+ring*60+v*18|0;c.fillStyle=`rgb(${br},${br*0.58|0},${br*0.22|0})`;c.fillRect(x,y,1,1);
+      const ring=(Math.sin((x-8)*0.7+(y-8)*0.2)*0.5+0.5);
+      const ridgeNoise=Math.sin(x*0.8+y*0.3)*0.3+Math.sin(y*1.2)*0.2;
+      const v=r();
+      const baseColor=80+ring*55+v*20|0;
+      const darkVariation=ridgeNoise<-0.2?20:0;
+      const br=baseColor-darkVariation;
+      const g=(br*0.52|0)-(darkVariation*0.4|0);
+      const b=(br*0.18|0)-(darkVariation*0.3|0);
+      c.fillStyle=`rgb(${br},${g},${b})`;
+      c.fillRect(x,y,1,1);
+    }
+    c.fillStyle='rgba(30,15,5,0.4)';
+    for(let i=0;i<8;i++){
+      const ridgeX=Math.sin(i*0.8)*6+8;
+      const ridgeLen=Math.floor(8+Math.random()*6);
+      c.fillRect(ridgeX|0,0,1,ridgeLen);
+    }
+    for(let i=0;i<6;i++){
+      const ridgeY=Math.sin(i*1.2)*5+8;
+      const ridgeLen=Math.floor(5+Math.random()*5);
+      c.fillRect(0,ridgeY|0,ridgeLen,1);
     }
   },6);
   // LEAVES - lush vibrant green
@@ -600,7 +619,7 @@ function buildWorldMesh(){
   worldGroup=new THREE.Group();
   const cnts={};let wSurf=0;
   for(let x=0;x<WORLD_W;x++)for(let y=0;y<WORLD_H;y++)for(let z=0;z<WORLD_D;z++){
-    const b=gB(x,y,z);if(b===B.AIR||b===B.WATER||b===B.DEEP_WATER)continue;
+    const b=gB(x,y,z);if(b===B.AIR||b===B.WATER||b===B.DEEP_WATER||b===B.WOOD||b===B.LEAVES)continue;
     if(isVis(x,y,z))cnts[b]=(cnts[b]||0)+1;
   }
   for(let x=0;x<WORLD_W;x++)for(let y=0;y<WORLD_H;y++)for(let z=0;z<WORLD_D;z++){const b=gB(x,y,z);if((b===B.WATER||b===B.DEEP_WATER)&&gB(x,y+1,z)===B.AIR)wSurf++;}
@@ -624,16 +643,35 @@ function buildWorldMesh(){
   }
   for(const m of Object.values(insts))m.instanceMatrix.needsUpdate=true;
   scene.add(worldGroup);
-  // Tree canopy dynamic meshes
+  // 3D tree models with beautiful organic geometry
   if(treeTops.length>0){
-    const leafGeo=new THREE.SphereGeometry(2.5,8,8),leafMat=new THREE.MeshLambertMaterial({color:0x2d8a2d});
+    const buildTreeModel=(tx,ty,tz)=>{const treeGroup=new THREE.Group();const trunkH=h2(tx,tz)*1.5+1.5;const trunkGeo=new THREE.CylinderGeometry(.4,.6,trunkH,6,3),trunkMat=new THREE.MeshLambertMaterial({color:0x5d3a1a,map:null});const trunkMesh=new THREE.Mesh(trunkGeo,trunkMat);trunkMesh.castShadow=true;trunkMesh.receiveShadow=true;trunkMesh.position.y=trunkH*.5;treeGroup.add(trunkMesh);const leafMat=new THREE.MeshLambertMaterial({color:0x2d8a2d});const leafGeo=new THREE.SphereGeometry(2.2,8,8);const topLeaf=new THREE.Mesh(leafGeo,leafMat);topLeaf.castShadow=true;topLeaf.receiveShadow=true;topLeaf.position.y=trunkH+1.5;treeGroup.add(topLeaf);const midLeaf=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,8),leafMat);midLeaf.castShadow=true;midLeaf.receiveShadow=true;midLeaf.position.set(.6,trunkH+.5,.6);treeGroup.add(midLeaf);const lowLeaf=new THREE.Mesh(new THREE.SphereGeometry(1.6,8,8),leafMat);lowLeaf.castShadow=true;lowLeaf.receiveShadow=true;lowLeaf.position.set(-.5,trunkH-.3,-.5);treeGroup.add(lowLeaf);treeGroup.position.set(tx,ty,tz);treeGroup._treePhase=(tx*4.13+tz*2.87)%6.28;return treeGroup;};
     for(const t of treeTops){
-      const leafMesh=new THREE.Mesh(leafGeo,leafMat);
-      leafMesh.position.set(t.x,t.y,t.z);
-      leafMesh.castShadow=true;leafMesh.receiveShadow=true;
-      leafMesh._treePhase=t.phase;
-      worldGroup.add(leafMesh);
+      const treeModel=buildTreeModel(t.x,t.y,t.z);
+      worldGroup.add(treeModel);
     }
+  }
+  // 3D grass blades on exposed grass blocks
+  const grassCounts=[];for(let x=0;x<WORLD_W;x++)for(let y=0;y<WORLD_H;y++)for(let z=0;z<WORLD_D;z++){if(gB(x,y,z)===B.GRASS&&gB(x,y+1,z)===B.AIR)grassCounts.push([x,y,z]);}
+  if(grassCounts.length>0){
+    const grassBladeMat=new THREE.MeshLambertMaterial({color:0x7ab55c,side:THREE.DoubleSide});
+    const grassBladeGeo=new THREE.PlaneGeometry(.8,.8);
+    const grassInstanceCount=grassCounts.length*4;
+    const grassBladeMesh=new THREE.InstancedMesh(grassBladeGeo,grassBladeMat,grassInstanceCount);
+    grassBladeMesh.castShadow=true;grassBladeMesh.receiveShadow=true;
+    const dummyObj=new THREE.Object3D();let idx=0;
+    for(const[gx,gy,gz]of grassCounts){
+      for(let i=0;i<4;i++){
+        dummyObj.position.set(gx+.5,gy+1.1,gz+.5);
+        dummyObj.rotation.y=i*Math.PI*.5;
+        dummyObj.updateMatrix();
+        grassBladeMesh.setMatrixAt(idx,dummyObj.matrix);
+        idx++;
+      }
+    }
+    grassBladeMesh.instanceMatrix.needsUpdate=true;
+    grassBladeMesh._isGrassBlades=true;
+    worldGroup.add(grassBladeMesh);
   }
 }
 let rebuildTimer=null;
@@ -755,12 +793,12 @@ const MT={SHEEP:'sheep',COW:'cow',PBIRD:'pbird',BBIRD:'bbird',FISH:'fish',KUKI:'
 class Mob{
   constructor(type,x,y,z){this.type=type;this.pos=new THREE.Vector3(x,y,z);this.group=new THREE.Group();this.anim=Math.random()*6.28;this.wTimer=0;this.tx=x;this.tz=z;this.facing=Math.random()*6.28;this.legs=[];this.wings=[];this.isVillager=(type===MT.VILLAGER);this.buildMesh();this.group.position.copy(this.pos);mobGroup.add(this.group);}
   add(geo,mat,x,y,z,arr){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);this.group.add(m);if(arr)arr.push(m);return m;}
-  mkSheep(){const w=new THREE.MeshLambertMaterial({color:0xf2f2f2}),lm=new THREE.MeshLambertMaterial({color:0xd0d0d0}),fm=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.BoxGeometry(.9,.7,1.2),w,0,.5,0);this.head=this.add(new THREE.BoxGeometry(.56,.56,.56),w,0,1.0,.6);[[.14,.1,.29],[-.14,.1,.29]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.05),fm);e.position.set(ex,ey,ez);this.head.add(e);});[[-0.28,0,-0.4],[.28,0,-0.4],[-.28,0,.4],[.28,0,.4]].forEach(([lx,ly,lz])=>this.add(new THREE.BoxGeometry(.18,.48,.18),lm,lx,ly,lz,this.legs));}
-  mkCow(){const bm=new THREE.MeshLambertMaterial({color:0x8B4513}),sm=new THREE.MeshLambertMaterial({color:0xfaf0e6}),fm=new THREE.MeshLambertMaterial({color:0x4a2a0a}),hm=new THREE.MeshLambertMaterial({color:0xffe066});const body=this.add(new THREE.BoxGeometry(1,.85,1.4),bm,0,.62,0);const sp=new THREE.Mesh(new THREE.BoxGeometry(.4,.41,.42),sm);sp.position.set(.2,.1,0);body.add(sp);this.head=this.add(new THREE.BoxGeometry(.7,.62,.65),bm,0,1.12,.7);const snout=new THREE.Mesh(new THREE.BoxGeometry(.4,.24,.22),fm);snout.position.set(0,-.06,.36);this.head.add(snout);[[.24,.38,0],[-.24,.38,0]].forEach(([hx,hy,hz])=>{const h=new THREE.Mesh(new THREE.BoxGeometry(.1,.3,.1),hm);h.position.set(hx,hy,hz);this.head.add(h);});[[-0.35,0,-0.52],[.35,0,-0.52],[-.35,0,.52],[.35,0,.52]].forEach(([lx,ly,lz])=>this.add(new THREE.BoxGeometry(.22,.56,.22),bm,lx,ly,lz,this.legs));}
-  mkBird(col){const m=new THREE.MeshLambertMaterial({color:col}),dm=new THREE.MeshLambertMaterial({color:0x222}),bk=new THREE.MeshLambertMaterial({color:0xffa500});this.add(new THREE.BoxGeometry(.34,.28,.5),m,0,.15,0);this.head=this.add(new THREE.BoxGeometry(.27,.27,.27),m,0,.44,.2);[[.09,.03,.15],[-.09,.03,.15]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.BoxGeometry(.06,.06,.04),dm);e.position.set(ex,ey,ez);this.head.add(e);});const beak=new THREE.Mesh(new THREE.BoxGeometry(.07,.07,.14),bk);beak.position.set(0,-.02,.2);this.head.add(beak);[.23,-.23].forEach(wx=>this.add(new THREE.BoxGeometry(.11,.2,.38),m,wx,.1,0,this.wings));this.add(new THREE.BoxGeometry(.18,.14,.18),m,0,.1,-.28);}
-  mkFish(){const col=Math.random()>.5?0xff6b00:0x44aaff;const m=new THREE.MeshLambertMaterial({color:col}),dm=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.BoxGeometry(.18,.18,.45),m,0,.1,0);this.add(new THREE.BoxGeometry(.14,.22,.14),m,0,.1,-.28);const eye=new THREE.Mesh(new THREE.BoxGeometry(.05,.05,.04),dm);eye.position.set(.08,.12,.22);this.group.add(eye);this.add(new THREE.BoxGeometry(.04,.18,.22),m,0,.2,0,this.wings);}
-  mkKuki(){const bm=new THREE.MeshLambertMaterial({color:0x1a0a2e}),em=new THREE.MeshLambertMaterial({color:0xff0000,emissive:0xff2200,emissiveIntensity:.9}),hm=new THREE.MeshLambertMaterial({color:0x550000}),ham=new THREE.MeshLambertMaterial({color:0x666}),hnd=new THREE.MeshLambertMaterial({color:0x8B4513});this.add(new THREE.BoxGeometry(.72,.92,.52),bm,0,.84,0);this.head=this.add(new THREE.BoxGeometry(.66,.66,.58),bm,0,1.65,0);[[-.15,.05,.3],[.15,.05,.3]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.BoxGeometry(.13,.1,.05),em);e.position.set(ex,ey,ez);this.head.add(e);});[[-.22,.46,0],[.22,.46,0]].forEach(([hx,hy,hz])=>{const h=new THREE.Mesh(new THREE.BoxGeometry(.1,.32,.1),hm);h.position.set(hx,hy,hz);this.head.add(h);});[[-0.22,0,0],[.22,0,0]].forEach(([lx,ly,lz])=>this.add(new THREE.BoxGeometry(.22,.62,.22),bm,lx,ly,lz,this.legs));this.add(new THREE.BoxGeometry(.2,.7,.2),bm,-.46,.9,0);this.add(new THREE.BoxGeometry(.2,.7,.2),bm,.46,.9,0);const hg=new THREE.Group();hg.position.set(.46,.9,.1);hg.rotation.z=.5;hg.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(.09,.72,.09),hnd)));const hh=new THREE.Mesh(new THREE.BoxGeometry(.4,.22,.22),ham);hh.position.y=.42;hg.add(hh);this.group.add(hg);this.hammerG=hg;}
-  mkVillager(){const skin=new THREE.MeshLambertMaterial({color:0xf5cba7}),robe=new THREE.MeshLambertMaterial({color:0x5d3a8a}),trim=new THREE.MeshLambertMaterial({color:0xffd700}),eye=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.BoxGeometry(.72,1.0,.52),robe,0,.75,0);this.add(new THREE.BoxGeometry(.74,.15,.54),trim,0,.26,0);this.head=this.add(new THREE.BoxGeometry(.6,.65,.6),skin,0,1.58,0);this.add(new THREE.BoxGeometry(.16,.18,.22),skin,0,1.54,.3);[[.14,.1,.31],[-.14,.1,.31]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.04),eye);e.position.set(ex,ey,ez);this.head.add(e);});this.add(new THREE.BoxGeometry(.18,.72,.18),robe,-.48,.9,0);this.add(new THREE.BoxGeometry(.18,.72,.18),robe,.48,.9,0);[[-0.18,0,0],[.18,0,0]].forEach(([lx,ly,lz])=>this.add(new THREE.BoxGeometry(.2,.5,.22),new THREE.MeshLambertMaterial({color:0x3d2a6a}),lx,ly,lz,this.legs));}
+  mkSheep(){const w=new THREE.MeshLambertMaterial({color:0xf2f2f2}),lm=new THREE.MeshLambertMaterial({color:0xd0d0d0}),fm=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.SphereGeometry(.65,.7,1.2),w,0,.5,0);this.head=this.add(new THREE.SphereGeometry(.38,8,8),w,0,1.0,.6);[[.14,.1,.29],[-.14,.1,.29]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.07,6,6),fm);e.position.set(ex,ey,ez);this.head.add(e);});[[-0.28,0,-0.4],[.28,0,-0.4],[-.28,0,.4],[.28,0,.4]].forEach(([lx,ly,lz])=>this.add(new THREE.CylinderGeometry(.12,.09,.48,6,3),lm,lx,ly,lz,this.legs));}
+  mkCow(){const bm=new THREE.MeshLambertMaterial({color:0x8B4513}),sm=new THREE.MeshLambertMaterial({color:0xfaf0e6}),fm=new THREE.MeshLambertMaterial({color:0x4a2a0a}),hm=new THREE.MeshLambertMaterial({color:0xffe066});const body=this.add(new THREE.SphereGeometry(.7,.85,1.4),bm,0,.62,0);const sp=new THREE.Mesh(new THREE.SphereGeometry(.28,.41,.42),sm);sp.position.set(.2,.1,0);body.add(sp);this.head=this.add(new THREE.SphereGeometry(.48,8,8),bm,0,1.12,.7);const snout=new THREE.Mesh(new THREE.SphereGeometry(.22,6,6),fm);snout.position.set(0,-.06,.36);this.head.add(snout);[[.24,.38,0],[-.24,.38,0]].forEach(([hx,hy,hz])=>{const h=new THREE.Mesh(new THREE.SphereGeometry(.08,6,6),hm);h.position.set(hx,hy,hz);this.head.add(h);});[[-0.35,0,-0.52],[.35,0,-0.52],[-.35,0,.52],[.35,0,.52]].forEach(([lx,ly,lz])=>this.add(new THREE.CylinderGeometry(.15,.12,.56,6,3),bm,lx,ly,lz,this.legs));}
+  mkBird(col){const m=new THREE.MeshLambertMaterial({color:col}),dm=new THREE.MeshLambertMaterial({color:0x222}),bk=new THREE.MeshLambertMaterial({color:0xffa500});this.add(new THREE.SphereGeometry(.32,8,8),m,0,.15,0);this.head=this.add(new THREE.SphereGeometry(.22,8,8),m,0,.44,.2);[[.09,.03,.15],[-.09,.03,.15]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),dm);e.position.set(ex,ey,ez);this.head.add(e);});const beak=new THREE.Mesh(new THREE.CylinderGeometry(.05,.03,.14,5,2),bk);beak.position.set(0,-.02,.2);beak.rotation.z=Math.PI/2;this.head.add(beak);[.23,-.23].forEach(wx=>this.add(new THREE.SphereGeometry(.18,.2,.38),m,wx,.1,0,this.wings));this.add(new THREE.SphereGeometry(.14,8,8),m,0,.1,-.28);}
+  mkFish(){const col=Math.random()>.5?0xff6b00:0x44aaff;const m=new THREE.MeshLambertMaterial({color:col}),dm=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.SphereGeometry(.18,8,6),m,0,.1,0);this.add(new THREE.SphereGeometry(.14,8,8),m,0,.1,-.28);const eye=new THREE.Mesh(new THREE.SphereGeometry(.04,6,6),dm);eye.position.set(.08,.12,.22);this.group.add(eye);this.add(new THREE.CylinderGeometry(.04,.04,.22,5,2),m,0,.2,0,this.wings);}
+  mkKuki(){const bm=new THREE.MeshLambertMaterial({color:0x1a0a2e}),em=new THREE.MeshLambertMaterial({color:0xff0000,emissive:0xff2200,emissiveIntensity:.9}),hm=new THREE.MeshLambertMaterial({color:0x550000}),ham=new THREE.MeshLambertMaterial({color:0x666}),hnd=new THREE.MeshLambertMaterial({color:0x8B4513});this.add(new THREE.SphereGeometry(.52,8,8),bm,0,.84,0);this.head=this.add(new THREE.SphereGeometry(.46,10,10),bm,0,1.65,0);[[-.15,.05,.3],[.15,.05,.3]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.09,8,6),em);e.position.set(ex,ey,ez);this.head.add(e);});[[-.22,.46,0],[.22,.46,0]].forEach(([hx,hy,hz])=>{const h=new THREE.Mesh(new THREE.SphereGeometry(.08,8,8),hm);h.position.set(hx,hy,hz);this.head.add(h);});[[-0.22,0,0],[.22,0,0]].forEach(([lx,ly,lz])=>this.add(new THREE.CylinderGeometry(.16,.12,.62,6,3),bm,lx,ly,lz,this.legs));this.add(new THREE.CylinderGeometry(.15,.12,.7,6,3),bm,-.46,.9,0);this.add(new THREE.CylinderGeometry(.15,.12,.7,6,3),bm,.46,.9,0);const hg=new THREE.Group();hg.position.set(.46,.9,.1);hg.rotation.z=.5;hg.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.72,5,3),hnd)));const hh=new THREE.Mesh(new THREE.SphereGeometry(.28,.22,.22),ham);hh.position.y=.42;hg.add(hh);this.group.add(hg);this.hammerG=hg;}
+  mkVillager(){const skin=new THREE.MeshLambertMaterial({color:0xf5cba7}),robe=new THREE.MeshLambertMaterial({color:0x5d3a8a}),trim=new THREE.MeshLambertMaterial({color:0xffd700}),eye=new THREE.MeshLambertMaterial({color:0x222});this.add(new THREE.SphereGeometry(.52,8,8),robe,0,.75,0);this.add(new THREE.CylinderGeometry(.52,.48,.15,8,2),trim,0,.26,0);this.head=this.add(new THREE.SphereGeometry(.42,10,10),skin,0,1.58,0);this.add(new THREE.SphereGeometry(.14,8,6),skin,0,1.54,.3);[[.14,.1,.31],[-.14,.1,.31]].forEach(([ex,ey,ez])=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.07,6,6),eye);e.position.set(ex,ey,ez);this.head.add(e);});this.add(new THREE.CylinderGeometry(.12,.1,.72,6,3),robe,-.48,.9,0);this.add(new THREE.CylinderGeometry(.12,.1,.72,6,3),robe,.48,.9,0);[[-0.18,0,0],[.18,0,0]].forEach(([lx,ly,lz])=>this.add(new THREE.CylinderGeometry(.14,.1,.5,6,3),new THREE.MeshLambertMaterial({color:0x3d2a6a}),lx,ly,lz,this.legs));}
   buildMesh(){switch(this.type){case MT.SHEEP:this.mkSheep();break;case MT.COW:this.mkCow();break;case MT.PBIRD:this.mkBird(0xff69b4);break;case MT.BBIRD:this.mkBird(0x4169e1);break;case MT.FISH:this.mkFish();break;case MT.KUKI:this.mkKuki();break;case MT.VILLAGER:this.mkVillager();break;}}
   update(dt){
     this.anim+=dt*2.2;this.wTimer-=dt;
@@ -776,6 +814,20 @@ class Mob{
     if(this.wings.length){const fl=Math.sin(this.anim*9)*.45;this.wings.forEach((w,i)=>w.rotation.z=fl*(i===0?1:-1));}
     if(this.hammerG)this.hammerG.rotation.z=.5+Math.sin(this.anim*3.5)*.6;
     if(this.head)this.head.rotation.y=Math.sin(this.anim*.8)*.15;
+    // Villager ambient whistle/hum sounds
+    if(this.isVillager&&!this._soundTimer){this._soundTimer=0;}
+    if(this.isVillager){
+      this._soundTimer=(this._soundTimer||0)+dt;
+      if(this._soundTimer>4+Math.random()*6){
+        const freq=200+Math.random()*300;
+        const osc=audioCtx.createOscillator();const gain=audioCtx.createGain();
+        osc.type=Math.random()>.5?'sine':'triangle';osc.frequency.value=freq;
+        gain.gain.setValueAtTime(.05,audioCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.5);
+        osc.connect(gain);gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+.5);
+        this._soundTimer=0;
+      }
+    }
   }
 }
 let kukiOut=false;
@@ -1039,12 +1091,21 @@ function gameLoop(ts){
   animID=requestAnimationFrame(gameLoop);
   const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;
   if(!paused){updatePlayer(dt);updateDayNight(dt);mobs.forEach(m=>m.update(dt));updateBreaking(dt);updateHL();updateParticles(dt);}
-  // Animate tree canopies with wind sway
+  // Animate tree canopies with wind sway and grass blade wind effects
   if(worldGroup){
     worldGroup.children.forEach(child=>{
       if(child._treePhase!==undefined){
         const sway=Math.sin(ts*0.001+child._treePhase)*0.08;
         child.rotation.z=sway;
+      }
+      if(child._isGrassBlades){
+        const windStrength=Math.sin(ts*0.0015)*0.3+Math.sin(ts*0.0008+2)*0.2;
+        const grassShader=child.material;
+        if(grassShader.uniforms===undefined){
+          const baseColor=grassShader.color.getHex();
+          grassShader.transparent=true;
+        }
+        child.children?.forEach((blade,idx)=>{blade.rotation.x=windStrength*0.4;});
       }
     });
   }
