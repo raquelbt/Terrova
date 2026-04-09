@@ -651,23 +651,21 @@ function buildWorldMesh(){
       worldGroup.add(treeModel);
     }
   }
-  // 3D grass blades on exposed grass blocks
-  const grassCounts=[];for(let x=0;x<WORLD_W;x++)for(let y=0;y<WORLD_H;y++)for(let z=0;z<WORLD_D;z++){if(gB(x,y,z)===B.GRASS&&gB(x,y+1,z)===B.AIR)grassCounts.push([x,y,z]);}
+  // 3D grass blades — short, sparse (every 3rd block, 2 crossed blades each)
+  const grassCounts=[];for(let x=0;x<WORLD_W;x++)for(let z=0;z<WORLD_D;z++){const sy=getSY(x,z);if(gB(x,sy,z)===B.GRASS&&gB(x,sy+1,z)===B.AIR&&(x+z)%3===0)grassCounts.push([x,sy,z]);}
   if(grassCounts.length>0){
-    const grassBladeMat=new THREE.MeshLambertMaterial({color:0x7ab55c,side:THREE.DoubleSide});
-    const grassBladeGeo=new THREE.PlaneGeometry(.8,.8);
-    const grassInstanceCount=grassCounts.length*4;
-    const grassBladeMesh=new THREE.InstancedMesh(grassBladeGeo,grassBladeMat,grassInstanceCount);
-    grassBladeMesh.castShadow=true;grassBladeMesh.receiveShadow=true;
+    const grassBladeMat=new THREE.MeshLambertMaterial({color:0x52b82e,side:THREE.DoubleSide,transparent:true,alphaTest:0.05});
+    const grassBladeGeo=new THREE.PlaneGeometry(.45,.22);grassBladeGeo.translate(0,.11,0);
+    const grassBladeMesh=new THREE.InstancedMesh(grassBladeGeo,grassBladeMat,grassCounts.length*2);
+    grassBladeMesh.castShadow=false;
     const dummyObj=new THREE.Object3D();let idx=0;
     for(const[gx,gy,gz]of grassCounts){
-      for(let i=0;i<4;i++){
-        dummyObj.position.set(gx+.5,gy+1.1,gz+.5);
-        dummyObj.rotation.y=i*Math.PI*.5;
-        dummyObj.updateMatrix();
-        grassBladeMesh.setMatrixAt(idx,dummyObj.matrix);
-        idx++;
-      }
+      const rng=mkPRNG(gx*113+gz*71);
+      const ox=(rng()-.5)*.3,oz=(rng()-.5)*.3,tilt=(rng()-.5)*.3;
+      // Blade 1 (0°)
+      dummyObj.position.set(gx+.5+ox,gy+.5,gz+.5+oz);dummyObj.rotation.set(tilt,rng()*Math.PI,0,'YXZ');dummyObj.updateMatrix();grassBladeMesh.setMatrixAt(idx++,dummyObj.matrix);
+      // Blade 2 (90°)
+      dummyObj.rotation.y+=Math.PI*.5;dummyObj.updateMatrix();grassBladeMesh.setMatrixAt(idx++,dummyObj.matrix);
     }
     grassBladeMesh.instanceMatrix.needsUpdate=true;
     grassBladeMesh._isGrassBlades=true;
@@ -865,14 +863,26 @@ function updatePlayer(dt){
     const PASSABLE=b=>b===B.AIR||b===B.WATER||b===B.DEEP_WATER||b===B.SEAGRASS||b===B.LEAVES||b===B.DOOR_OPEN;
     function solidAt(tx,ty,tz){return!PASSABLE(gB(Math.round(tx),ty,Math.round(tz)));}
     function hBlocked(tx,tz){
-      const groundY=Math.round(pPos.y-PHEIGHT); // block player stands ON
-      return solidAt(tx,groundY+1,tz)||solidAt(tx,groundY+2,tz); // check ABOVE ground
+      if(creativeMode)return false; // creative: phase through everything
+      const groundY=Math.round(pPos.y-PHEIGHT);
+      const low=solidAt(tx,groundY+1,tz);
+      const high=solidAt(tx,groundY+2,tz);
+      // Allow 1-block step-up (low solid but high clear = stair/ledge)
+      return low&&high;
     }
     if(!hBlocked(nx,pPos.z))pPos.x=Math.max(1,Math.min(WORLD_W-2,nx));
     if(!hBlocked(pPos.x,nz))pPos.z=Math.max(1,Math.min(WORLD_D-2,nz));
   }
   if(creativeMode){
-    if(keys.Space)pPos.y+=6*dt;else if(keys.ShiftLeft||keys.ControlLeft)pPos.y-=6*dt;
+    if(keys.Space){pPos.y+=8*dt;pVelY=0;}
+    else if(keys.ShiftLeft||keys.ControlLeft){pPos.y-=8*dt;pVelY=0;}
+    else{
+      // Walk on ground when not flying
+      pVelY+=GRAV*dt;pPos.y+=pVelY*dt;
+      const gy=getSY(pPos.x,pPos.z)+PHEIGHT;
+      if(pPos.y<=gy){pPos.y=gy;pVelY=0;pOnGround=true;}else pOnGround=false;
+      if(keys.Space&&pOnGround){pVelY=JVEL;pOnGround=false;}
+    }
     pPos.y=Math.max(.5,pPos.y);
   } else {
     pVelY+=GRAV*dt;pPos.y+=pVelY*dt;
